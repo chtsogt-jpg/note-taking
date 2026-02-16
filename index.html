@@ -4,9 +4,359 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Note Taking App</title>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+                Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #f0f2f5;
+            color: #1a1a2e;
+            min-height: 100vh;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #16213e;
+            letter-spacing: -0.5px;
+        }
+
+        header p {
+            color: #6b7280;
+            margin-top: 0.25rem;
+            font-size: 0.95rem;
+        }
+
+        /* --- Status Indicator --- */
+        .status-bar {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+            color: #6b7280;
+            min-height: 1.4em;
+        }
+
+        .status-bar .saved {
+            color: #059669;
+            font-weight: 500;
+        }
+
+        .status-bar .error {
+            color: #dc2626;
+            font-weight: 500;
+        }
+
+        /* --- Note Form --- */
+        .note-form {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+            margin-bottom: 2rem;
+        }
+
+        .note-form input[type="text"],
+        .note-form textarea {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            font-size: 0.95rem;
+            font-family: inherit;
+            color: #1a1a2e;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            background: #fafafa;
+        }
+
+        .note-form input[type="text"]:focus,
+        .note-form textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            background: #fff;
+        }
+
+        .note-form input[type="text"] {
+            margin-bottom: 0.75rem;
+            font-weight: 500;
+        }
+
+        .note-form textarea {
+            margin-bottom: 1rem;
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .note-form input::placeholder,
+        .note-form textarea::placeholder {
+            color: #9ca3af;
+        }
+
+        .btn-add {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: #3b82f6;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.7rem 1.4rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .btn-add:hover {
+            background: #2563eb;
+        }
+
+        .btn-add:active {
+            transform: scale(0.97);
+        }
+
+        /* --- Notes List --- */
+        .notes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .notes-list .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #9ca3af;
+            font-size: 0.95rem;
+        }
+
+        .note-card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+            position: relative;
+            transition: box-shadow 0.2s;
+        }
+
+        .note-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .note-card h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #16213e;
+            margin-bottom: 0.4rem;
+            padding-right: 2.5rem;
+        }
+
+        .note-card .note-content {
+            color: #4b5563;
+            font-size: 0.92rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .note-card .note-date {
+            display: block;
+            margin-top: 0.75rem;
+            font-size: 0.78rem;
+            color: #9ca3af;
+        }
+
+        .btn-delete {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: #9ca3af;
+            font-size: 1.2rem;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .btn-delete:hover {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 480px) {
+            body {
+                padding: 1rem 0.75rem;
+            }
+
+            header h1 {
+                font-size: 1.5rem;
+            }
+
+            .note-form {
+                padding: 1rem;
+            }
+
+            .note-card {
+                padding: 1rem 1.25rem;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h1>Note Taking App</h1>
-    <p>Features coming soon...</p>
+    <div class="container">
+        <header>
+            <h1>Note Taking App</h1>
+            <p>Capture your thoughts quickly</p>
+        </header>
+
+        <div class="status-bar" id="statusBar"></div>
+
+        <div class="note-form">
+            <input type="text" id="noteTitle" placeholder="Note title" maxlength="120" />
+            <textarea id="noteContent" placeholder="Write your note here..." rows="4"></textarea>
+            <button class="btn-add" id="addNoteBtn">+ Add Note</button>
+        </div>
+
+        <div class="notes-list" id="notesList">
+            <div class="empty-state">No notes yet. Create one above!</div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            'use strict';
+
+            // ---- State ----
+            let notes = [];
+
+            // ---- DOM refs ----
+            const titleInput = document.getElementById('noteTitle');
+            const contentInput = document.getElementById('noteContent');
+            const addBtn = document.getElementById('addNoteBtn');
+            const notesList = document.getElementById('notesList');
+            const statusBar = document.getElementById('statusBar');
+
+            // ---- Helpers ----
+            function generateId() {
+                return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+            }
+
+            function formatDate(ts) {
+                const d = new Date(ts);
+                return d.toLocaleDateString(undefined, {
+                    year: 'numeric', month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+            }
+
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            // ---- Render ----
+            function render() {
+                if (notes.length === 0) {
+                    notesList.innerHTML = '<div class="empty-state">No notes yet. Create one above!</div>';
+                    updateStatus();
+                    return;
+                }
+
+                // Show newest first
+                const sorted = [...notes].sort((a, b) => b.createdAt - a.createdAt);
+                notesList.innerHTML = sorted.map(function (note) {
+                    return '<div class="note-card" data-id="' + note.id + '">'
+                        + '<button class="btn-delete" title="Delete note">&times;</button>'
+                        + '<h3>' + escapeHtml(note.title || 'Untitled') + '</h3>'
+                        + '<div class="note-content">' + escapeHtml(note.content) + '</div>'
+                        + '<span class="note-date">' + formatDate(note.createdAt) + '</span>'
+                        + '</div>';
+                }).join('');
+
+                updateStatus();
+            }
+
+            function updateStatus() {
+                const count = notes.length;
+                statusBar.innerHTML = '<span class="saved">' + count + ' note' + (count !== 1 ? 's' : '') + ' stored</span>';
+            }
+
+            // ---- Actions ----
+            function addNote() {
+                const title = titleInput.value.trim();
+                const content = contentInput.value.trim();
+
+                if (!content && !title) {
+                    titleInput.focus();
+                    return;
+                }
+
+                const note = {
+                    id: generateId(),
+                    title: title,
+                    content: content,
+                    createdAt: Date.now()
+                };
+
+                notes.push(note);
+                titleInput.value = '';
+                contentInput.value = '';
+                titleInput.focus();
+
+                render();
+            }
+
+            function deleteNote(id) {
+                notes = notes.filter(function (n) { return n.id !== id; });
+                render();
+            }
+
+            // ---- Event Listeners ----
+            addBtn.addEventListener('click', addNote);
+
+            // Allow Ctrl+Enter / Cmd+Enter to submit from textarea
+            contentInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    addNote();
+                }
+            });
+
+            // Delegate delete clicks
+            notesList.addEventListener('click', function (e) {
+                const btn = e.target.closest('.btn-delete');
+                if (!btn) return;
+                const card = btn.closest('.note-card');
+                if (card) {
+                    deleteNote(card.dataset.id);
+                }
+            });
+
+            // ---- Init ----
+            render();
+        })();
+    </script>
 </body>
 </html>

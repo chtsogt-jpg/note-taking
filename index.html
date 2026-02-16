@@ -232,6 +232,101 @@
             color: #fff;
         }
 
+        /* ── Search bar ── */
+        .search-bar {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .search-bar .search-icon {
+            color: #aaa;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .search-bar .search-input-wrap {
+            flex: 1;
+            position: relative;
+        }
+
+        .search-bar input[type="text"] {
+            width: 100%;
+            padding: 0.6rem 2.2rem 0.6rem 0.75rem;
+            border: 1.5px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            background: #fafafa;
+        }
+
+        .search-bar input[type="text"]:focus {
+            outline: none;
+            border-color: #4a6cf7;
+            box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.15);
+            background: #fff;
+        }
+
+        .search-bar .btn-clear-search {
+            position: absolute;
+            right: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: #aaa;
+            font-size: 1.1rem;
+            cursor: pointer;
+            padding: 0.15rem 0.3rem;
+            border-radius: 4px;
+            line-height: 1;
+            display: none;
+            transition: color 0.2s;
+        }
+
+        .search-bar .btn-clear-search:hover {
+            color: #e74c3c;
+        }
+
+        .search-bar .btn-clear-search.visible {
+            display: block;
+        }
+
+        .search-results-info {
+            font-size: 0.85rem;
+            color: #888;
+            font-weight: 500;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .highlight {
+            background-color: #fef08a;
+            border-radius: 2px;
+            padding: 0 1px;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #aaa;
+        }
+
+        .no-results .no-results-icon {
+            font-size: 3rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .no-results p {
+            font-size: 1rem;
+        }
+
         /* ── Empty state ── */
         .empty-state {
             text-align: center;
@@ -281,6 +376,16 @@
             <button class="btn-add" id="btn-add-note">Add Note</button>
         </section>
 
+        <!-- Search Bar -->
+        <div class="search-bar" id="search-bar">
+            <span class="search-icon">&#128269;</span>
+            <div class="search-input-wrap">
+                <input type="text" id="search-input" placeholder="Search notes...">
+                <button class="btn-clear-search" id="btn-clear-search" title="Clear search">&times;</button>
+            </div>
+            <span class="search-results-info" id="search-results-info"></span>
+        </div>
+
         <!-- Notes List -->
         <section>
             <div class="notes-header">
@@ -310,6 +415,9 @@
             const notesGrid    = document.getElementById('notes-grid');
             const noteCountEl  = document.getElementById('note-count');
             const statusBar    = document.getElementById('status-bar');
+            const searchInput  = document.getElementById('search-input');
+            const clearSearchBtn = document.getElementById('btn-clear-search');
+            const searchResultsInfo = document.getElementById('search-results-info');
 
             // ── Helpers ──
             function generateId() {
@@ -333,6 +441,28 @@
                 const div = document.createElement('div');
                 div.textContent = text;
                 return div.innerHTML;
+            }
+
+            function highlightText(text, query) {
+                if (!query) return escapeHtml(text);
+                var escaped = escapeHtml(text);
+                var escapedQuery = escapeHtml(query);
+                // Escape regex special characters in the query
+                var regexSafe = escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                var regex = new RegExp('(' + regexSafe + ')', 'gi');
+                return escaped.replace(regex, '<span class="highlight">$1</span>');
+            }
+
+            function getSearchQuery() {
+                return searchInput.value.trim().toLowerCase();
+            }
+
+            function filterNotes(query) {
+                if (!query) return notes.slice();
+                return notes.filter(function(note) {
+                    return note.title.toLowerCase().indexOf(query) !== -1 ||
+                           note.content.toLowerCase().indexOf(query) !== -1;
+                });
             }
 
             // ── LocalStorage Persistence ──
@@ -365,21 +495,39 @@
 
             // ── Render ──
             function renderNotes(justSaved) {
+                var query = getSearchQuery();
+                var filtered = filterNotes(query);
+                var totalCount = notes.length;
+                var filteredCount = filtered.length;
+
                 // Update count
-                const count = notes.length;
-                noteCountEl.textContent = count === 0 ? '' : count + (count === 1 ? ' note' : ' notes');
+                noteCountEl.textContent = totalCount === 0 ? '' : totalCount + (totalCount === 1 ? ' note' : ' notes');
 
                 // Update status bar
                 if (justSaved) {
-                    statusBar.innerHTML = '<span class="saved">' + count + ' note' + (count !== 1 ? 's' : '') + ' stored &middot; Saved</span>';
-                } else if (count > 0) {
-                    statusBar.innerHTML = '<span class="saved">' + count + ' note' + (count !== 1 ? 's' : '') + ' stored</span>';
+                    statusBar.innerHTML = '<span class="saved">' + totalCount + ' note' + (totalCount !== 1 ? 's' : '') + ' stored &middot; Saved</span>';
+                } else if (totalCount > 0) {
+                    statusBar.innerHTML = '<span class="saved">' + totalCount + ' note' + (totalCount !== 1 ? 's' : '') + ' stored</span>';
                 } else {
                     statusBar.textContent = '';
                 }
 
-                // Empty state
-                if (count === 0) {
+                // Update search results info
+                if (query && totalCount > 0) {
+                    searchResultsInfo.textContent = filteredCount + ' of ' + totalCount + ' note' + (totalCount !== 1 ? 's' : '');
+                } else {
+                    searchResultsInfo.textContent = '';
+                }
+
+                // Toggle clear button visibility
+                if (searchInput.value.trim().length > 0) {
+                    clearSearchBtn.classList.add('visible');
+                } else {
+                    clearSearchBtn.classList.remove('visible');
+                }
+
+                // Empty state (no notes at all)
+                if (totalCount === 0) {
                     notesGrid.innerHTML =
                         '<div class="empty-state">' +
                             '<div class="empty-icon">&#128221;</div>' +
@@ -388,15 +536,28 @@
                     return;
                 }
 
+                // No results from search
+                if (query && filteredCount === 0) {
+                    notesGrid.innerHTML =
+                        '<div class="no-results">' +
+                            '<div class="no-results-icon">&#128270;</div>' +
+                            '<p>No notes match your search.</p>' +
+                        '</div>';
+                    return;
+                }
+
                 // Build cards (newest first)
+                var rawQuery = searchInput.value.trim();
                 let html = '';
-                for (let i = notes.length - 1; i >= 0; i--) {
-                    const note = notes[i];
+                for (let i = filtered.length - 1; i >= 0; i--) {
+                    const note = filtered[i];
                     const preview = truncate(note.content, 100);
+                    var titleHtml = query ? highlightText(note.title, rawQuery) : escapeHtml(note.title);
+                    var previewHtml = query ? highlightText(preview, rawQuery) : escapeHtml(preview);
                     html +=
                         '<div class="note-card">' +
-                            '<div class="note-title">' + escapeHtml(note.title) + '</div>' +
-                            '<div class="note-preview">' + escapeHtml(preview) + '</div>' +
+                            '<div class="note-title">' + titleHtml + '</div>' +
+                            '<div class="note-preview">' + previewHtml + '</div>' +
                             '<div class="note-footer">' +
                                 '<span class="note-date">' + formatDate(note.createdAt) + '</span>' +
                                 '<button class="btn-delete" data-id="' + note.id + '">Delete</button>' +
@@ -468,6 +629,26 @@
             notesGrid.addEventListener('click', function(e) {
                 if (e.target.classList.contains('btn-delete')) {
                     deleteNote(e.target.getAttribute('data-id'));
+                }
+            });
+
+            // Search: filter notes as user types
+            searchInput.addEventListener('input', function() {
+                renderNotes(false);
+            });
+
+            // Clear search button
+            clearSearchBtn.addEventListener('click', function() {
+                searchInput.value = '';
+                searchInput.focus();
+                renderNotes(false);
+            });
+
+            // Allow Escape key to clear search
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    searchInput.value = '';
+                    renderNotes(false);
                 }
             });
 

@@ -272,7 +272,139 @@
     </div>
 
     <script>
-        // JavaScript functionality will be added next.
+        // ── State ──
+        let notes = [];
+
+        // ── DOM references ──
+        const titleInput   = document.getElementById('note-title');
+        const contentInput = document.getElementById('note-content');
+        const addBtn       = document.getElementById('btn-add-note');
+        const notesGrid    = document.getElementById('notes-grid');
+        const noteCountEl  = document.getElementById('note-count');
+
+        // ── Helpers ──
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        }
+
+        function formatDate(isoString) {
+            const d = new Date(isoString);
+            return d.toLocaleDateString('en-US', {
+                year: 'numeric', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+        }
+
+        function truncate(text, maxLen) {
+            if (text.length <= maxLen) return text;
+            return text.slice(0, maxLen).trimEnd() + '...';
+        }
+
+        // ── Render ──
+        function renderNotes() {
+            // Update count
+            const count = notes.length;
+            noteCountEl.textContent = count === 0 ? '' : count + (count === 1 ? ' note' : ' notes');
+
+            // Empty state
+            if (count === 0) {
+                notesGrid.innerHTML =
+                    '<div class="empty-state">' +
+                        '<div class="empty-icon">&#128221;</div>' +
+                        '<p>No notes yet. Create your first note above!</p>' +
+                    '</div>';
+                return;
+            }
+
+            // Build cards (newest first)
+            let html = '';
+            for (let i = notes.length - 1; i >= 0; i--) {
+                const note = notes[i];
+                const preview = truncate(note.content, 100);
+                html +=
+                    '<div class="note-card">' +
+                        '<div class="note-title">' + escapeHtml(note.title) + '</div>' +
+                        '<div class="note-preview">' + escapeHtml(preview) + '</div>' +
+                        '<div class="note-footer">' +
+                            '<span class="note-date">' + formatDate(note.createdAt) + '</span>' +
+                            '<button class="btn-delete" data-id="' + note.id + '">Delete</button>' +
+                        '</div>' +
+                    '</div>';
+            }
+            notesGrid.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ── Create note ──
+        function addNote() {
+            const title   = titleInput.value.trim();
+            const content = contentInput.value.trim();
+
+            if (!title) {
+                alert('Please enter a title for your note.');
+                titleInput.focus();
+                return;
+            }
+            if (!content) {
+                alert('Please enter some content for your note.');
+                contentInput.focus();
+                return;
+            }
+
+            const note = {
+                id: generateId(),
+                title: title,
+                content: content,
+                createdAt: new Date().toISOString()
+            };
+
+            notes.push(note);
+
+            // Clear form
+            titleInput.value  = '';
+            contentInput.value = '';
+            titleInput.focus();
+
+            renderNotes();
+        }
+
+        // ── Delete note ──
+        function deleteNote(id) {
+            const note = notes.find(function(n) { return n.id === id; });
+            if (!note) return;
+
+            const confirmed = confirm('Are you sure you want to delete "' + note.title + '"?');
+            if (!confirmed) return;
+
+            notes = notes.filter(function(n) { return n.id !== id; });
+            renderNotes();
+        }
+
+        // ── Event listeners ──
+        addBtn.addEventListener('click', addNote);
+
+        // Allow Enter key in title field to move focus to content
+        titleInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                contentInput.focus();
+            }
+        });
+
+        // Delegate delete clicks
+        notesGrid.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-delete')) {
+                deleteNote(e.target.getAttribute('data-id'));
+            }
+        });
+
+        // Initial render
+        renderNotes();
     </script>
 </body>
 </html>

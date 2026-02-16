@@ -48,6 +48,25 @@
             padding: 2rem 1rem;
         }
 
+        /* ── Status Bar ── */
+        .status-bar {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+            color: #6b7280;
+            min-height: 1.4em;
+        }
+
+        .status-bar .saved {
+            color: #059669;
+            font-weight: 500;
+        }
+
+        .status-bar .error {
+            color: #dc2626;
+            font-weight: 500;
+        }
+
         /* ── Create-note form ── */
         .note-form {
             background: #ffffff;
@@ -245,6 +264,9 @@
     </header>
 
     <div class="container">
+        <!-- Status Bar -->
+        <div class="status-bar" id="status-bar"></div>
+
         <!-- Create Note Form -->
         <section class="note-form">
             <h2>Create a New Note</h2>
@@ -272,139 +294,187 @@
     </div>
 
     <script>
-        // ── State ──
-        let notes = [];
+        (function () {
+            'use strict';
 
-        // ── DOM references ──
-        const titleInput   = document.getElementById('note-title');
-        const contentInput = document.getElementById('note-content');
-        const addBtn       = document.getElementById('btn-add-note');
-        const notesGrid    = document.getElementById('notes-grid');
-        const noteCountEl  = document.getElementById('note-count');
+            // ── LocalStorage Config ──
+            const STORAGE_KEY = 'noteApp_notes';
 
-        // ── Helpers ──
-        function generateId() {
-            return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-        }
+            // ── State ──
+            let notes = [];
 
-        function formatDate(isoString) {
-            const d = new Date(isoString);
-            return d.toLocaleDateString('en-US', {
-                year: 'numeric', month: 'short', day: 'numeric',
-                hour: '2-digit', minute: '2-digit'
-            });
-        }
+            // ── DOM references ──
+            const titleInput   = document.getElementById('note-title');
+            const contentInput = document.getElementById('note-content');
+            const addBtn       = document.getElementById('btn-add-note');
+            const notesGrid    = document.getElementById('notes-grid');
+            const noteCountEl  = document.getElementById('note-count');
+            const statusBar    = document.getElementById('status-bar');
 
-        function truncate(text, maxLen) {
-            if (text.length <= maxLen) return text;
-            return text.slice(0, maxLen).trimEnd() + '...';
-        }
-
-        // ── Render ──
-        function renderNotes() {
-            // Update count
-            const count = notes.length;
-            noteCountEl.textContent = count === 0 ? '' : count + (count === 1 ? ' note' : ' notes');
-
-            // Empty state
-            if (count === 0) {
-                notesGrid.innerHTML =
-                    '<div class="empty-state">' +
-                        '<div class="empty-icon">&#128221;</div>' +
-                        '<p>No notes yet. Create your first note above!</p>' +
-                    '</div>';
-                return;
+            // ── Helpers ──
+            function generateId() {
+                return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
             }
 
-            // Build cards (newest first)
-            let html = '';
-            for (let i = notes.length - 1; i >= 0; i--) {
-                const note = notes[i];
-                const preview = truncate(note.content, 100);
-                html +=
-                    '<div class="note-card">' +
-                        '<div class="note-title">' + escapeHtml(note.title) + '</div>' +
-                        '<div class="note-preview">' + escapeHtml(preview) + '</div>' +
-                        '<div class="note-footer">' +
-                            '<span class="note-date">' + formatDate(note.createdAt) + '</span>' +
-                            '<button class="btn-delete" data-id="' + note.id + '">Delete</button>' +
-                        '</div>' +
-                    '</div>';
+            function formatDate(isoString) {
+                const d = new Date(isoString);
+                return d.toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
             }
-            notesGrid.innerHTML = html;
-        }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
+            function truncate(text, maxLen) {
+                if (text.length <= maxLen) return text;
+                return text.slice(0, maxLen).trimEnd() + '...';
+            }
 
-        // ── Create note ──
-        function addNote() {
-            const title   = titleInput.value.trim();
-            const content = contentInput.value.trim();
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
 
-            if (!title) {
-                alert('Please enter a title for your note.');
+            // ── LocalStorage Persistence ──
+            function saveNotes() {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+                    return true;
+                } catch (e) {
+                    console.error('Failed to save notes to localStorage:', e);
+                    statusBar.innerHTML = '<span class="error">Storage error: could not save. Free up space and try again.</span>';
+                    return false;
+                }
+            }
+
+            function loadNotes() {
+                try {
+                    const data = localStorage.getItem(STORAGE_KEY);
+                    if (data) {
+                        const parsed = JSON.parse(data);
+                        if (Array.isArray(parsed)) {
+                            notes = parsed;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to load notes from localStorage:', e);
+                    notes = [];
+                    statusBar.innerHTML = '<span class="error">Could not load saved notes. Starting fresh.</span>';
+                }
+            }
+
+            // ── Render ──
+            function renderNotes(justSaved) {
+                // Update count
+                const count = notes.length;
+                noteCountEl.textContent = count === 0 ? '' : count + (count === 1 ? ' note' : ' notes');
+
+                // Update status bar
+                if (justSaved) {
+                    statusBar.innerHTML = '<span class="saved">' + count + ' note' + (count !== 1 ? 's' : '') + ' stored &middot; Saved</span>';
+                } else if (count > 0) {
+                    statusBar.innerHTML = '<span class="saved">' + count + ' note' + (count !== 1 ? 's' : '') + ' stored</span>';
+                } else {
+                    statusBar.textContent = '';
+                }
+
+                // Empty state
+                if (count === 0) {
+                    notesGrid.innerHTML =
+                        '<div class="empty-state">' +
+                            '<div class="empty-icon">&#128221;</div>' +
+                            '<p>No notes yet. Create your first note above!</p>' +
+                        '</div>';
+                    return;
+                }
+
+                // Build cards (newest first)
+                let html = '';
+                for (let i = notes.length - 1; i >= 0; i--) {
+                    const note = notes[i];
+                    const preview = truncate(note.content, 100);
+                    html +=
+                        '<div class="note-card">' +
+                            '<div class="note-title">' + escapeHtml(note.title) + '</div>' +
+                            '<div class="note-preview">' + escapeHtml(preview) + '</div>' +
+                            '<div class="note-footer">' +
+                                '<span class="note-date">' + formatDate(note.createdAt) + '</span>' +
+                                '<button class="btn-delete" data-id="' + note.id + '">Delete</button>' +
+                            '</div>' +
+                        '</div>';
+                }
+                notesGrid.innerHTML = html;
+            }
+
+            // ── Create note ──
+            function addNote() {
+                const title   = titleInput.value.trim();
+                const content = contentInput.value.trim();
+
+                if (!title) {
+                    alert('Please enter a title for your note.');
+                    titleInput.focus();
+                    return;
+                }
+                if (!content) {
+                    alert('Please enter some content for your note.');
+                    contentInput.focus();
+                    return;
+                }
+
+                const note = {
+                    id: generateId(),
+                    title: title,
+                    content: content,
+                    createdAt: new Date().toISOString()
+                };
+
+                notes.push(note);
+                saveNotes();
+
+                // Clear form
+                titleInput.value  = '';
+                contentInput.value = '';
                 titleInput.focus();
-                return;
-            }
-            if (!content) {
-                alert('Please enter some content for your note.');
-                contentInput.focus();
-                return;
+
+                renderNotes(true);
             }
 
-            const note = {
-                id: generateId(),
-                title: title,
-                content: content,
-                createdAt: new Date().toISOString()
-            };
+            // ── Delete note ──
+            function deleteNote(id) {
+                const note = notes.find(function(n) { return n.id === id; });
+                if (!note) return;
 
-            notes.push(note);
+                const confirmed = confirm('Are you sure you want to delete "' + note.title + '"?');
+                if (!confirmed) return;
 
-            // Clear form
-            titleInput.value  = '';
-            contentInput.value = '';
-            titleInput.focus();
+                notes = notes.filter(function(n) { return n.id !== id; });
+                saveNotes();
+                renderNotes(true);
+            }
 
+            // ── Event listeners ──
+            addBtn.addEventListener('click', addNote);
+
+            // Allow Enter key in title field to move focus to content
+            titleInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    contentInput.focus();
+                }
+            });
+
+            // Delegate delete clicks
+            notesGrid.addEventListener('click', function(e) {
+                if (e.target.classList.contains('btn-delete')) {
+                    deleteNote(e.target.getAttribute('data-id'));
+                }
+            });
+
+            // ── Init: load from localStorage and render ──
+            loadNotes();
             renderNotes();
-        }
-
-        // ── Delete note ──
-        function deleteNote(id) {
-            const note = notes.find(function(n) { return n.id === id; });
-            if (!note) return;
-
-            const confirmed = confirm('Are you sure you want to delete "' + note.title + '"?');
-            if (!confirmed) return;
-
-            notes = notes.filter(function(n) { return n.id !== id; });
-            renderNotes();
-        }
-
-        // ── Event listeners ──
-        addBtn.addEventListener('click', addNote);
-
-        // Allow Enter key in title field to move focus to content
-        titleInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                contentInput.focus();
-            }
-        });
-
-        // Delegate delete clicks
-        notesGrid.addEventListener('click', function(e) {
-            if (e.target.classList.contains('btn-delete')) {
-                deleteNote(e.target.getAttribute('data-id'));
-            }
-        });
-
-        // Initial render
-        renderNotes();
+        })();
     </script>
 </body>
 </html>

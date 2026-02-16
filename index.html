@@ -248,6 +248,9 @@
         (function () {
             'use strict';
 
+            // ---- LocalStorage Config ----
+            const STORAGE_KEY = 'noteApp_notes';
+
             // ---- State ----
             let notes = [];
 
@@ -277,11 +280,40 @@
                 return div.innerHTML;
             }
 
+            // ---- LocalStorage Persistence ----
+            function saveNotes() {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+                    return true;
+                } catch (e) {
+                    // Handle QuotaExceededError or any other storage error
+                    console.error('Failed to save notes to localStorage:', e);
+                    statusBar.innerHTML = '<span class="error">Storage error: could not save. Free up space and try again.</span>';
+                    return false;
+                }
+            }
+
+            function loadNotes() {
+                try {
+                    const data = localStorage.getItem(STORAGE_KEY);
+                    if (data) {
+                        const parsed = JSON.parse(data);
+                        if (Array.isArray(parsed)) {
+                            notes = parsed;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to load notes from localStorage:', e);
+                    notes = [];
+                    statusBar.innerHTML = '<span class="error">Could not load saved notes. Starting fresh.</span>';
+                }
+            }
+
             // ---- Render ----
-            function render() {
+            function render(justSaved) {
                 if (notes.length === 0) {
                     notesList.innerHTML = '<div class="empty-state">No notes yet. Create one above!</div>';
-                    updateStatus();
+                    updateStatus(justSaved);
                     return;
                 }
 
@@ -296,12 +328,13 @@
                         + '</div>';
                 }).join('');
 
-                updateStatus();
+                updateStatus(justSaved);
             }
 
-            function updateStatus() {
+            function updateStatus(justSaved) {
                 const count = notes.length;
-                statusBar.innerHTML = '<span class="saved">' + count + ' note' + (count !== 1 ? 's' : '') + ' stored</span>';
+                const savedLabel = justSaved ? ' &middot; Saved' : '';
+                statusBar.innerHTML = '<span class="saved">' + count + ' note' + (count !== 1 ? 's' : '') + ' stored' + savedLabel + '</span>';
             }
 
             // ---- Actions ----
@@ -322,16 +355,18 @@
                 };
 
                 notes.push(note);
+                saveNotes();
                 titleInput.value = '';
                 contentInput.value = '';
                 titleInput.focus();
 
-                render();
+                render(true);
             }
 
             function deleteNote(id) {
                 notes = notes.filter(function (n) { return n.id !== id; });
-                render();
+                saveNotes();
+                render(true);
             }
 
             // ---- Event Listeners ----
@@ -355,6 +390,7 @@
             });
 
             // ---- Init ----
+            loadNotes();
             render();
         })();
     </script>

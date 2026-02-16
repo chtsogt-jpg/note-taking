@@ -178,6 +178,7 @@
             flex-direction: column;
             transition: transform 0.2s, box-shadow 0.2s;
             position: relative;
+            cursor: pointer;
         }
 
         .note-card:hover {
@@ -327,6 +328,70 @@
             font-size: 1rem;
         }
 
+        /* ── Cancel button ── */
+        .btn-cancel {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.7rem 1.6rem;
+            background: #6b7280;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            margin-left: 0.75rem;
+        }
+
+        .btn-cancel:hover {
+            background: #4b5563;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(107, 114, 128, 0.4);
+        }
+
+        .btn-cancel:active {
+            transform: translateY(0);
+        }
+
+        /* ── Note card edit hint ── */
+        .note-card .edit-hint {
+            position: absolute;
+            top: 0.65rem;
+            right: 0.65rem;
+            font-size: 0.7rem;
+            color: #b0b0b0;
+            background: #f3f4f6;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        .note-card:hover .edit-hint {
+            opacity: 1;
+        }
+
+        .note-card .note-updated {
+            font-size: 0.72rem;
+            color: #4a6cf7;
+            font-style: italic;
+            margin-top: 0.15rem;
+        }
+
+        /* ── Edit mode form highlight ── */
+        .note-form.editing {
+            border: 2px solid #4a6cf7;
+            box-shadow: 0 2px 12px rgba(74, 108, 247, 0.15);
+        }
+
+        .form-buttons {
+            display: flex;
+            align-items: center;
+        }
+
         /* ── Empty state ── */
         .empty-state {
             text-align: center;
@@ -373,7 +438,10 @@
                 <label for="note-content">Content</label>
                 <textarea id="note-content" placeholder="Write your note here..."></textarea>
             </div>
-            <button class="btn-add" id="btn-add-note">Add Note</button>
+            <div class="form-buttons">
+                <button class="btn-add" id="btn-add-note">Add Note</button>
+                <button class="btn-cancel" id="btn-cancel-edit" style="display:none;">Cancel</button>
+            </div>
         </section>
 
         <!-- Search Bar -->
@@ -407,11 +475,15 @@
 
             // ── State ──
             let notes = [];
+            let editingNoteId = null;
 
             // ── DOM references ──
             const titleInput   = document.getElementById('note-title');
             const contentInput = document.getElementById('note-content');
             const addBtn       = document.getElementById('btn-add-note');
+            const cancelBtn    = document.getElementById('btn-cancel-edit');
+            const noteForm     = document.querySelector('.note-form');
+            const formHeading  = noteForm.querySelector('h2');
             const notesGrid    = document.getElementById('notes-grid');
             const noteCountEl  = document.getElementById('note-count');
             const statusBar    = document.getElementById('status-bar');
@@ -447,7 +519,6 @@
                 if (!query) return escapeHtml(text);
                 var escaped = escapeHtml(text);
                 var escapedQuery = escapeHtml(query);
-                // Escape regex special characters in the query
                 var regexSafe = escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 var regex = new RegExp('(' + regexSafe + ')', 'gi');
                 return escaped.replace(regex, '<span class="highlight">$1</span>');
@@ -554,12 +625,17 @@
                     const preview = truncate(note.content, 100);
                     var titleHtml = query ? highlightText(note.title, rawQuery) : escapeHtml(note.title);
                     var previewHtml = query ? highlightText(preview, rawQuery) : escapeHtml(preview);
+                    var updatedHtml = '';
+                    if (note.updatedAt) {
+                        updatedHtml = '<div class="note-updated">Edited ' + formatDate(note.updatedAt) + '</div>';
+                    }
                     html +=
-                        '<div class="note-card">' +
+                        '<div class="note-card" data-id="' + note.id + '">' +
+                            '<span class="edit-hint">&#9998; click to edit</span>' +
                             '<div class="note-title">' + titleHtml + '</div>' +
                             '<div class="note-preview">' + previewHtml + '</div>' +
                             '<div class="note-footer">' +
-                                '<span class="note-date">' + formatDate(note.createdAt) + '</span>' +
+                                '<span class="note-date">' + formatDate(note.createdAt) + updatedHtml + '</span>' +
                                 '<button class="btn-delete" data-id="' + note.id + '">Delete</button>' +
                             '</div>' +
                         '</div>';
@@ -601,13 +677,77 @@
                 renderNotes(true);
             }
 
-            // ── Delete note ──
-            function deleteNote(id) {
-                const note = notes.find(function(n) { return n.id === id; });
+            // ── Edit note: enter edit mode ──
+            function startEditNote(id) {
+                var note = notes.find(function(n) { return n.id === id; });
                 if (!note) return;
 
-                const confirmed = confirm('Are you sure you want to delete "' + note.title + '"?');
+                editingNoteId = id;
+
+                titleInput.value   = note.title;
+                contentInput.value = note.content;
+
+                formHeading.textContent = 'Edit Note';
+                addBtn.textContent      = 'Save Changes';
+                cancelBtn.style.display = 'inline-flex';
+                noteForm.classList.add('editing');
+
+                noteForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                titleInput.focus();
+            }
+
+            // ── Edit note: save changes ──
+            function saveEditNote() {
+                var title   = titleInput.value.trim();
+                var content = contentInput.value.trim();
+
+                if (!title) {
+                    alert('Please enter a title for your note.');
+                    titleInput.focus();
+                    return;
+                }
+                if (!content) {
+                    alert('Please enter some content for your note.');
+                    contentInput.focus();
+                    return;
+                }
+
+                var note = notes.find(function(n) { return n.id === editingNoteId; });
+                if (!note) return;
+
+                note.title     = title;
+                note.content   = content;
+                note.updatedAt = new Date().toISOString();
+
+                saveNotes();
+                cancelEdit();
+                renderNotes(true);
+            }
+
+            // ── Edit note: cancel and return to create mode ──
+            function cancelEdit() {
+                editingNoteId = null;
+
+                titleInput.value   = '';
+                contentInput.value = '';
+
+                formHeading.textContent = 'Create a New Note';
+                addBtn.textContent      = 'Add Note';
+                cancelBtn.style.display = 'none';
+                noteForm.classList.remove('editing');
+            }
+
+            // ── Delete note ──
+            function deleteNote(id) {
+                var note = notes.find(function(n) { return n.id === id; });
+                if (!note) return;
+
+                var confirmed = confirm('Are you sure you want to delete "' + note.title + '"?');
                 if (!confirmed) return;
+
+                if (editingNoteId === id) {
+                    cancelEdit();
+                }
 
                 notes = notes.filter(function(n) { return n.id !== id; });
                 saveNotes();
@@ -615,9 +755,16 @@
             }
 
             // ── Event listeners ──
-            addBtn.addEventListener('click', addNote);
+            addBtn.addEventListener('click', function() {
+                if (editingNoteId) {
+                    saveEditNote();
+                } else {
+                    addNote();
+                }
+            });
 
-            // Allow Enter key in title field to move focus to content
+            cancelBtn.addEventListener('click', cancelEdit);
+
             titleInput.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -625,10 +772,16 @@
                 }
             });
 
-            // Delegate delete clicks
+            // Delegate delete clicks and note card clicks for editing
             notesGrid.addEventListener('click', function(e) {
                 if (e.target.classList.contains('btn-delete')) {
                     deleteNote(e.target.getAttribute('data-id'));
+                    return;
+                }
+
+                var card = e.target.closest('.note-card');
+                if (card && card.dataset.id) {
+                    startEditNote(card.dataset.id);
                 }
             });
 
